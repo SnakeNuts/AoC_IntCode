@@ -1,6 +1,6 @@
 from intcode_cpu import IntCodeCPU
 
-with open("AoC_1.txt") as code_input:
+with open("AoC_2.txt") as code_input:
     code = list(map(int, code_input.readline().split(",")))
 
 cpu = IntCodeCPU(code)
