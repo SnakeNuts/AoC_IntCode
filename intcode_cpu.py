@@ -1,3 +1,6 @@
+import queue
+
+
 def get_digit(number, n):
     return number // 10**n % 10
 
@@ -7,6 +10,27 @@ class IntCodeCPU:
     def __init__(self, program: list[int]) -> None:
         self.program = program
         self.instruction_pointer = 0
+        self.input_mode = 0
+        self.output_mode = 0
+        self.input_buffer = queue.SimpleQueue()
+        self.output_buffer = 0
+        self.exited = False
+
+    # input mode 0 = wait for keyboard
+    # input mode 1 = read from input_buffer
+
+    # output mode 0 = print to screen
+    # output mode 1 = write to output_buffer
+    # output_mode 2 = write to output_buffer, halt execution but keep state
+
+    def set_input_mode(self, input_mode) -> None:
+        self.input_mode = input_mode
+
+    def set_output_mode(self, output_mode) -> None:
+        self.output_mode = output_mode
+
+    def add_input_value(self, input_value) -> None:
+        self.input_buffer.put(input_value)
 
     # make this into 'read_values(count)' which returns a tuple of 'count' ints and can be used to multi-assign
     def read_next_value(self) -> int:
@@ -53,12 +77,22 @@ class IntCodeCPU:
     def opcode_input(self, param_1_mode, param_2_mode, param_3_mode) -> None:
         param1 = self.read_next_value()
 
-        self.write_position(param1, int(input("Please input number:")))
+        if self.input_mode == 0:
+            self.write_position(param1, int(input("Please input number:")))
+        elif self.input_mode == 1:
+            self.write_position(param1, self.input_buffer.get())
 
     def opcode_output(self, param_1_mode, param_2_mode, param_3_mode) -> None:
         param1 = self.read(self.read_next_value(), param_1_mode)
 
-        print(param1)
+        if self.output_mode == 0:
+            print(param1)
+        elif self.output_mode == 1:
+            self.output_buffer = param1
+        elif self.output_mode == 2:
+            self.output_buffer = param1
+            return True  # Exit program
+        return False  # Do not exit program
 
     def opcode_jump_if_true(self, param_1_mode, param_2_mode, param_3_mode) -> None:
         param1 = self.read(self.read_next_value(), param_1_mode)
@@ -102,6 +136,7 @@ class IntCodeCPU:
 
             match opcode:
                 case 99:
+                    self.exited = True
                     break
                 case 1:
                     self.opcode_add(param_1_mode, param_2_mode, param_3_mode)
@@ -110,7 +145,11 @@ class IntCodeCPU:
                 case 3:
                     self.opcode_input(param_1_mode, param_2_mode, param_3_mode)
                 case 4:
-                    self.opcode_output(param_1_mode, param_2_mode, param_3_mode)
+                    stop_run = self.opcode_output(
+                        param_1_mode, param_2_mode, param_3_mode
+                    )
+                    if stop_run is True:
+                        break
                 case 5:
                     self.opcode_jump_if_true(param_1_mode, param_2_mode, param_3_mode)
                 case 6:
@@ -121,8 +160,6 @@ class IntCodeCPU:
                     self.opcode_equals(param_1_mode, param_2_mode, param_3_mode)
                 case _:
                     print("Illegal Opcode")
-
-        print("Program finished")
 
     def dump_memory(self) -> None:
         print(",".join(list(map(str, self.program))))
