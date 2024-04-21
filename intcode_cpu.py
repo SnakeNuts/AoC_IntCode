@@ -1,4 +1,5 @@
 import queue
+from collections import defaultdict
 
 
 def get_digit(number, n):
@@ -7,9 +8,15 @@ def get_digit(number, n):
 
 class IntCodeCPU:
 
+    def import_program(self, program) -> None:
+        for counter in range(0, len(program)):
+            self.program[counter] = program[counter]
+
     def __init__(self, program: list[int]) -> None:
-        self.program = program
+        self.program = defaultdict(int)
+        self.import_program(program)
         self.instruction_pointer = 0
+        self.relative_base = 0
         self.input_mode = 0
         self.output_mode = 0
         self.input_buffer = queue.SimpleQueue()
@@ -52,35 +59,49 @@ class IntCodeCPU:
     def write_position(self, address: int, value: int) -> None:
         self.program[address] = value
 
+    def write(self, param, param_mode, value) -> None:
+        if param_mode == 0:
+            self.write_position(param, value)
+        elif param_mode == 1:
+            raise Exception(
+                "Illegal write param mode! Writes cannot be done in immediate mode"
+            )
+        elif param_mode == 2:
+            self.write_position(param + self.relative_base, value)
+        else:
+            raise Exception("Unknown write param mode")
+
     def read(self, param, param_mode):
         if param_mode == 0:
             return self.read_position(param)
         elif param_mode == 1:
             return param
+        elif param_mode == 2:
+            return self.read_position(param + self.relative_base)
         else:
-            raise Exception("Unknown param mode")
+            raise Exception("Unknown read param mode")
 
     def opcode_add(self, param_1_mode, param_2_mode, param_3_mode) -> None:
         param1 = self.read(self.read_next_value(), param_1_mode)
         param2 = self.read(self.read_next_value(), param_2_mode)
         param3 = self.read_next_value()
 
-        self.write_position(param3, (param1 + param2))
+        self.write(param3, param_3_mode, (param1 + param2))
 
     def opcode_multiply(self, param_1_mode, param_2_mode, param_3_mode) -> None:
         param1 = self.read(self.read_next_value(), param_1_mode)
         param2 = self.read(self.read_next_value(), param_2_mode)
         param3 = self.read_next_value()
 
-        self.write_position(param3, (param1 * param2))
+        self.write(param3, param_3_mode, (param1 * param2))
 
     def opcode_input(self, param_1_mode, param_2_mode, param_3_mode) -> None:
         param1 = self.read_next_value()
 
         if self.input_mode == 0:
-            self.write_position(param1, int(input("Please input number:")))
+            self.write(param1, param_1_mode, int(input("Please input number:")))
         elif self.input_mode == 1:
-            self.write_position(param1, self.input_buffer.get())
+            self.write(param1, param_1_mode, self.input_buffer.get())
 
     def opcode_output(self, param_1_mode, param_2_mode, param_3_mode) -> None:
         param1 = self.read(self.read_next_value(), param_1_mode)
@@ -114,9 +135,9 @@ class IntCodeCPU:
         param3 = self.read_next_value()
 
         if param1 < param2:
-            self.write_position(param3, 1)
+            self.write(param3, param_3_mode, 1)
         else:
-            self.write_position(param3, 0)
+            self.write(param3, param_3_mode, 0)
 
     def opcode_equals(self, param_1_mode, param_2_mode, param_3_mode) -> None:
         param1 = self.read(self.read_next_value(), param_1_mode)
@@ -124,9 +145,16 @@ class IntCodeCPU:
         param3 = self.read_next_value()
 
         if param1 == param2:
-            self.write_position(param3, 1)
+            self.write(param3, param_3_mode, 1)
         else:
-            self.write_position(param3, 0)
+            self.write(param3, param_3_mode, 0)
+
+    def opcode_set_relative_base(
+        self, param_1_mode, param_2_mode, param_3_mode
+    ) -> None:
+        param1 = self.read(self.read_next_value(), param_1_mode)
+
+        self.relative_base += param1
 
     def run(self) -> None:
         while True:
@@ -158,17 +186,20 @@ class IntCodeCPU:
                     self.opcode_less_than(param_1_mode, param_2_mode, param_3_mode)
                 case 8:
                     self.opcode_equals(param_1_mode, param_2_mode, param_3_mode)
+                case 9:
+                    self.opcode_set_relative_base(
+                        param_1_mode, param_2_mode, param_3_mode
+                    )
                 case _:
                     print("Illegal Opcode")
 
-    def dump_memory(self) -> None:
-        print(",".join(list(map(str, self.program))))
 
     def print_memory_location(self, address: int) -> None:
         print(self.read_position(address))
 
 
 if __name__ == "__main__":
-    test_CPU = IntCodeCPU([1, 9, 10, 3, 2, 3, 11, 0, 99, 30, 40, 50])
+    test_CPU = IntCodeCPU(
+        [104,1125899906842624,99]
+    )
     test_CPU.run()
-    test_CPU.dump_memory()
